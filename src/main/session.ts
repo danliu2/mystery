@@ -1,6 +1,7 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import type {
+  DecisionAudit,
   Action,
   Command,
   GameState,
@@ -18,6 +19,7 @@ import { PRESETS } from "../domain/resources.js";
 import { Store } from "../storage/store.js";
 import {
   createRoster,
+  normalizeRosterAppearance,
   selectFriends,
   publicDescription,
   restRoster,
@@ -59,8 +61,9 @@ export class Session extends EventEmitter {
     super();
   }
   async initialize() {
-    this.roster =
-      (await this.store.loadRoster()) || createRoster(randomInt(1, 0x7fffffff));
+    this.roster = normalizeRosterAppearance(
+      (await this.store.loadRoster()) || createRoster(randomInt(1, 0x7fffffff)),
+    );
     await this.store.saveRoster(this.roster);
   }
   private exclusive<T>(fn: () => Promise<T>): Promise<T> {
@@ -77,6 +80,7 @@ export class Session extends EventEmitter {
       people: this.roster.people.map((p) => ({
         id: p.id,
         name: p.name,
+        gender: p.gender,
         description: publicDescription(p),
         games: p.experienceCount,
       })),
@@ -145,6 +149,7 @@ export class Session extends EventEmitter {
         friends: friends.map((p) => ({
           playerId: p.id,
           name: p.name,
+          gender: p.gender,
           description: publicDescription(p),
         })),
       });
@@ -199,8 +204,14 @@ export class Session extends EventEmitter {
         )
           throw new Error("ROSTER_MISMATCH");
         await this.store.backupRoster();
-        await this.store.saveRoster(snapshot);
-        this.roster = structuredClone(snapshot);
+        await this.store.saveRoster(normalizeRosterAppearance(snapshot));
+        this.roster = normalizeRosterAppearance(snapshot);
+      }
+      for (const player of next.players) {
+        if (player.actor === "ai" && !player.gender)
+          player.gender =
+            this.roster.people.find((p) => p.id === player.playerId)?.gender ??
+            null;
       }
       this.cancel();
       this.pendingCandidate = null;
@@ -414,7 +425,7 @@ export class Session extends EventEmitter {
     this.timer = setTimeout(() => {
       this.timer = null;
       this.pump();
-    }, 60);
+    }, 0);
   }
   private pump() {
     const s = this.state;
@@ -440,10 +451,22 @@ export class Session extends EventEmitter {
       )!;
       void (async () => {
         let action: Action;
+        let audit: Pick<
+          DecisionAudit,
+          "model" | "promptHash" | "decisionReason" | "attempts"
+        > = { model: "", promptHash: "", decisionReason: "", attempts: [] };
+        let decisionError: string | undefined;
         try {
           action =
             this.mode === "model"
-              ? await this.gateway!.decide(snapshot, persona, controller.signal)
+              ? await this.gateway!.decide(
+                  snapshot,
+                  persona,
+                  controller.signal,
+                  (record) => {
+                    audit = record;
+                  },
+                )
               : demoDecision(snapshot, persona);
           this.failures = 0;
         } catch (e) {
@@ -455,6 +478,8 @@ export class Session extends EventEmitter {
             this.publish();
             return;
           }
+          decisionError =
+            e instanceof ServiceError ? e.code : "DECISION_FAILED";
           action = defaultAction(snapshot);
           this.failures++;
           if (this.failures >= 3) {
@@ -480,6 +505,29 @@ export class Session extends EventEmitter {
             windowId: snapshot.windowId!,
             action,
           });
+          if (this.mode === "model") {
+            next.decisionAudits = [
+              ...(next.decisionAudits || []),
+              {
+                ...audit,
+                seat,
+                playerId: persona.id,
+                name: persona.name,
+                day: snapshot.day,
+                phase: snapshot.phase,
+                windowId: snapshot.windowId!,
+                action: structuredClone(action),
+                source: decisionError ? "fallback" : "model",
+                ...(decisionError
+                  ? {
+                      error: decisionError,
+                      decisionReason:
+                        "模型决策失败，由主持人执行默认动作；不存在模型决策理由。",
+                    }
+                  : {}),
+              },
+            ];
+          }
           await this.commit(next);
         });
       })()

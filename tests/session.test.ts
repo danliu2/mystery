@@ -70,7 +70,18 @@ test("pause cancels scheduling and restore retains the accepted human vote", asy
     const restored = new Session(new Store(f.dir), null);
     await restored.initialize();
     await restored.load(v.observation.gameId);
-    assert.equal(restored.view()!.observation.submitted, true);
+    const saved = await restored.store.load(v.observation.gameId);
+    assert.equal(saved!.commands.vote.seat, 1);
+    assert.deepEqual(JSON.parse(saved!.commands.vote.fingerprint).action, {
+      type: "wolfVote",
+      targetSeat: 3,
+    });
+    const version = saved!.version;
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.equal(
+      (await f.session.store.load(v.observation.gameId))!.version,
+      version,
+    );
     assert.equal(restored.view()!.paused, true);
     restored.pause();
   } finally {
@@ -85,6 +96,34 @@ test("abandon ends game without adding experience and repeated exit is safe", as
     assert.equal(f.session.view()!.observation.outcome?.status, "aborted");
     assert.ok((await f.session.review()).roles.length === 6);
     assert.equal(f.session.lobby().people[0].games, 0);
+  } finally {
+    await f.close();
+  }
+});
+
+import { createRoster } from "../src/agents/personas.js";
+import { createGame } from "../src/domain/engine.js";
+test("old match identities recover public gender from the preserved friend pool", async () => {
+  const f = await setup();
+  try {
+    const roster = createRoster(41);
+    await f.session.store.saveRoster(roster);
+    const names = ["苏晚晴", "林知远", "顾清禾", "陆景行", "宋念慈"];
+    const s = createGame({
+      count: 6,
+      seed: 44,
+      friends: names.map((name) => {
+        const p = roster.people.find((p) => p.name === name)!;
+        return { playerId: p.id, name: p.name, description: p.description };
+      }),
+    });
+    await f.session.store.commit(s);
+    await f.session.initialize();
+    await f.session.load(s.id);
+    assert.equal(f.session.view()!.observation.players[1].gender, "女");
+    assert.equal(f.session.view()!.observation.players[2].gender, "男");
+    await f.session.abandon();
+    assert.equal((await f.session.review()).roles[1].gender, "女");
   } finally {
     await f.close();
   }

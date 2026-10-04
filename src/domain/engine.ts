@@ -17,7 +17,12 @@ export interface Setup {
   count: number;
   seed: number;
   humanRole?: Role;
-  friends?: { playerId: string; name: string; description: string }[];
+  friends?: {
+    playerId: string;
+    name: string;
+    gender?: string;
+    description: string;
+  }[];
   humanName?: string;
 }
 const alive = (s: GameState) =>
@@ -137,6 +142,7 @@ export function createGame(setup: Setup): GameState {
         i === 0
           ? setup.humanName?.trim().slice(0, 20) || "我"
           : (setup.friends?.[i - 1]?.name ?? `朋友${i}`),
+      gender: i === 0 ? null : (setup.friends?.[i - 1]?.gender ?? null),
       description:
         i === 0
           ? "桌上唯一的真人玩家。"
@@ -707,7 +713,12 @@ export function abortGame(original: GameState) {
 export function fullReview(s: GameState) {
   if (!s.outcome) throw new Error("GAME_NOT_ENDED");
   return {
-    roles: s.players.map((p) => ({ seat: p.seat, name: p.name, role: p.role })),
+    roles: s.players.map((p) => ({
+      seat: p.seat,
+      name: p.name,
+      gender: p.gender,
+      role: p.role,
+    })),
     events: s.events
       .filter((e) => e.type !== "action")
       .map((e) => ({
@@ -717,5 +728,6 @@ export function fullReview(s: GameState) {
         data: e.audience === "host" ? e.data : undefined,
       })),
     outcome: s.outcome,
+    decisionAudits: structuredClone(s.decisionAudits || []),
   };
 }

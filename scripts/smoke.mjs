@@ -22,7 +22,8 @@ try {
   await page.getByLabel("桌上人数").selectOption("6");
   await page.getByLabel("你的身份").selectOption("villager");
   await page.getByRole("button", { name: "开始游戏 →" }).click();
-  await page.getByLabel("阅读速度").selectOption("0");
+  if ((await page.getByLabel("阅读速度").inputValue()) !== "0")
+    throw new Error("not instant by default");
   await page.getByRole("heading", { name: "今晚，你相信谁？" }).waitFor();
   await page.screenshot({
     path: ".superpowers/sdd/werewolf/screenshots/game.png",

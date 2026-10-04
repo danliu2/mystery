@@ -5,6 +5,9 @@ export interface ProviderConfig {
   model: string;
   jsonMode: boolean;
   contextTokens: number;
+  thinking?: boolean;
+  reasoningEffort?: "low" | "high" | "max";
+  maxOutputTokens?: number;
   maxRequests: number;
   maxTokens: number;
 }
@@ -63,12 +66,23 @@ export function parseConfig(text: string): ProviderConfig {
     contextTokens > 1000000
   )
     throw new Error("INVALID_CONTEXT_LIMIT");
+  if (
+    pairs.LLM_REASONING_EFFORT &&
+    !["low", "high", "max"].includes(pairs.LLM_REASONING_EFFORT)
+  )
+    throw new Error("INVALID_REASONING_EFFORT");
   return {
     baseURL: validateEndpoint(baseURL),
     apiKey,
     model,
     jsonMode: pairs.LLM_JSON_MODE !== "false",
     contextTokens,
+    ...(pairs.LLM_THINKING ? { thinking: pairs.LLM_THINKING === "true" } : {}),
+    ...(pairs.LLM_REASONING_EFFORT
+      ? {
+          reasoningEffort: pairs.LLM_REASONING_EFFORT as "low" | "high" | "max",
+        }
+      : {}),
     maxRequests: 300,
     maxTokens: 200000,
   };

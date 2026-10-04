@@ -52,3 +52,41 @@ test("rest is clamped and available once per completed match", () => {
   assert.equal(rested.people[0].energy, 25);
   assert.deepEqual(restRoster(rested), rested);
 });
+
+test("friend names, gender, stature and visible descriptions remain consistent across seeds", () => {
+  for (let seed = 1; seed <= 100; seed++) {
+    const people = createRoster(seed).people;
+    assert.equal(people.filter((p) => p.gender === "女").length, 10);
+    assert.equal(people.filter((p) => p.gender === "男").length, 10);
+    const su = people.find((p) => p.name === "苏晚晴")!;
+    assert.equal(su.gender, "女");
+    assert.ok(su.height >= 158 && su.height <= 175);
+    for (const p of people) {
+      assert.ok(
+        p.gender === "女"
+          ? p.height >= 158 && p.height <= 175
+          : p.height >= 168 && p.height <= 186,
+      );
+      assert.ok(p.description.includes(p.gender));
+    }
+  }
+});
+
+test("legacy stature is corrected without resetting friend IDs or memories", async () => {
+  const module = (await import("../src/agents/personas.js")) as any;
+  assert.equal(typeof module.normalizeRosterAppearance, "function");
+  const old = createRoster(4);
+  const su = old.people.find((p) => p.name === "苏晚晴")!;
+  su.height = 191;
+  su.description = "苏晚晴，身高191厘米，穿着米色衬衫。眉眼有自己的神采。";
+  su.experienceCount = 12;
+  su.summary = "我的旧经验";
+  const updated = module.normalizeRosterAppearance(old);
+  const fixed = updated.people.find((p: any) => p.id === su.id);
+  assert.equal(fixed.gender, "女");
+  assert.ok(fixed.height <= 175);
+  assert.ok(!fixed.description.includes("191厘米"));
+  assert.equal(fixed.experienceCount, 12);
+  assert.equal(fixed.summary, "我的旧经验");
+  assert.deepEqual(module.normalizeRosterAppearance(updated), updated);
+});

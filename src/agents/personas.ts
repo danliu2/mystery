@@ -13,6 +13,7 @@ export interface Persona {
   id: string;
   name: string;
   gender: string;
+  appearanceVersion?: 2;
   age: number;
   height: number;
   weight: number;
@@ -57,6 +58,61 @@ const names = [
   "夏言",
   "安知",
 ];
+const femaleFeatures = [
+  "眉眼柔和，笑容温柔妩媚，举止自然大方。",
+  "长发整洁，眼神清亮，带着明朗灵动的气质。",
+  "眉目秀雅，神情从容，谈吐透着温婉的书卷气。",
+  "短发利落，笑容爽朗，气质清爽而自信。",
+];
+const maleFeatures = [
+  "眉目俊朗，笑容开朗，谈吐儒雅自然。",
+  "面部轮廓清晰，眼神沉稳，举止温和有礼。",
+  "短发清爽，神情明朗，带着阳光而松弛的气质。",
+  "眉眼清秀，姿态从容，谈吐有朴实的书卷气。",
+];
+function genderFor(name: string, index: number) {
+  const i = names.indexOf(name);
+  const slot = i < 0 ? index : i;
+  return slot < 8 ? "男" : slot < 16 ? "女" : slot % 2 === 0 ? "男" : "女";
+}
+function featureFor(gender: string, index: number) {
+  return (gender === "女" ? femaleFeatures : maleFeatures)[index % 4];
+}
+export function normalizeRosterAppearance(roster: Roster): Roster {
+  const next = structuredClone(roster);
+  for (const [i, p] of next.people.entries()) {
+    const gender = genderFor(p.name, i);
+    const [min, max] = gender === "女" ? [158, 175] : [168, 186];
+    const oldHeight = p.height;
+    if (!Number.isFinite(p.height) || p.height < min || p.height > max) {
+      p.height =
+        (gender === "女" ? 160 : 172) +
+        (Number.parseInt(digest(p.id).slice(0, 6), 16) % 12);
+      const bmi =
+        Number.isFinite(p.weight) && oldHeight > 0
+          ? p.weight / (oldHeight / 100) ** 2
+          : 22;
+      p.weight = Math.round(
+        Math.max(18.5, Math.min(26, bmi)) * (p.height / 100) ** 2,
+      );
+      p.description = p.description.replace(
+        new RegExp(String(oldHeight) + "(?=\\s*(?:厘米|cm))", "g"),
+        String(p.height),
+      );
+    }
+    p.gender = gender;
+    if (p.appearanceVersion !== 2) {
+      p.description = p.description.replace(
+        "眉眼有自己的神采",
+        featureFor(gender, i).replace(/。$/, ""),
+      );
+      if (!p.description.includes(gender))
+        p.description = `${gender === "女" ? "女性" : "男性"}。${p.description}`;
+      p.appearanceVersion = 2;
+    }
+  }
+  return next;
+}
 const outfits = ["深蓝针织衫", "米色衬衫", "墨绿外套", "灰色开衫", "白色T恤"];
 const traits = [
   "analysis",
@@ -92,19 +148,26 @@ export function createRoster(seed: number): Roster {
     ]),
   );
   const people = names.map((name, i): Persona => {
-    const height = 150 + Math.floor(random(rng, "people") * 46);
+    const gender = genderFor(name, i);
+    const height =
+      (gender === "女" ? 158 : 168) +
+      Math.floor(
+        ((random(rng, "people") + random(rng, "people")) / 2) *
+          (gender === "女" ? 18 : 19),
+      );
     const bmi = 18 + random(rng, "people") * 10;
     const weight = Math.max(
       45,
       Math.min(100, Math.round(bmi * (height / 100) ** 2)),
     );
     const clothes = outfits[Math.floor(random(rng, "people") * outfits.length)];
-    const gender = i < 8 ? "男" : i < 16 ? "女" : "中性";
+
     const age = 20 + Math.floor(random(rng, "people") * 26);
     return {
       id: `p-${digest(`${seed}:${i}`).slice(0, 12)}`,
       name,
       gender,
+      appearanceVersion: 2,
       age,
       height,
       weight,
@@ -113,7 +176,7 @@ export function createRoster(seed: number): Roster {
       energy: 80 + Math.floor(random(rng, "people") * 21),
       irritability: 0,
       traits: Object.fromEntries(traits.map((t) => [t, values[t][i]])),
-      description: `${name}，${age}岁，身高${height}厘米，穿着${clothes}。眉眼有自己的神采，落座时轻轻整理袖口，专注地望向桌面。`,
+      description: `${name}，${gender}，${age}岁，身高${height}厘米，穿着${clothes}。${featureFor(gender, i)}落座时轻轻整理袖口，专注地望向桌面。`,
       style: styles[i % styles.length],
       catchphrases: ["先听完整轮，再做判断。", "这条逻辑还需要一个解释。"],
       clothes,

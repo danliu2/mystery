@@ -239,3 +239,22 @@ test("nonacting viewers cannot distinguish a hidden hunter window from unproved 
   alternative.window.actors = [h];
   assert.deepEqual(observe(alternative, observer), before);
 });
+
+test("public player identity includes friend gender without exposing hidden roles", () => {
+  const s = createGame({
+    count: 6,
+    seed: 2,
+    friends: [
+      {
+        playerId: "p-a",
+        name: "苏晚晴",
+        gender: "女",
+        description: "温柔明朗",
+      },
+    ],
+  });
+  const o = observe(s, 1);
+  assert.equal(o.players[1].gender, "女");
+  assert.equal(o.players[1].name, "苏晚晴");
+  assert.ok(!("role" in o.players[1]));
+});

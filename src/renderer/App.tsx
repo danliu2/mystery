@@ -49,7 +49,8 @@ function App() {
   const [person, setPerson] = useState<any>(null),
     [manual, setManual] = useState(""),
     [review, setReview] = useState<any>(null),
-    [speed, setSpeed] = useState(6),
+    [reviewAgent, setReviewAgent] = useState(0),
+    [speed, setSpeed] = useState(0),
     [partial, setPartial] = useState({ id: "", text: "" }),
     [draft, setDraft] = useState(""),
     [target, setTarget] = useState<number | null>(null),
@@ -128,7 +129,7 @@ function App() {
   }, [view?.observation.gameId, next?.id, view?.paused, speed, pane]);
   useEffect(() => {
     if (autoScroll && pane === "table")
-      bottom.current?.scrollIntoView({ behavior: "smooth" });
+      bottom.current?.scrollIntoView({ behavior: "instant" });
   }, [view?.displayed, partial.text, autoScroll, pane]);
   useEffect(() => {
     setTarget(null);
@@ -499,7 +500,7 @@ function App() {
                       <div className="message-meta">
                         <strong>
                           {e.seat
-                            ? `${e.seat}号 · ${o.players[e.seat - 1].name}`
+                            ? `${e.seat}号 · ${o.players[e.seat - 1].name}${o.players[e.seat - 1].gender ? ` · ${o.players[e.seat - 1].gender}` : ""}`
                             : eventNames[e.type] || "记录"}
                         </strong>
                         <span>
@@ -844,6 +845,10 @@ function App() {
                   onClick={() =>
                     setPerson({
                       name: p.name,
+                      gender:
+                        p.gender ||
+                        lobby?.people.find((q: any) => q.name === p.name)
+                          ?.gender,
                       description: p.description,
                       gesture: p.gesture,
                       alive: p.alive,
@@ -868,8 +873,12 @@ function App() {
                       {p.seat === 1 && <small> 我</small>}
                     </strong>
                     <span>
-                      {p.seat}号 ·{" "}
-                      {p.alive ? gestureNames[p.gesture] : "已出局"}
+                      {p.seat}号
+                      {p.gender ||
+                      lobby?.people.find((q: any) => q.name === p.name)?.gender
+                        ? ` · ${p.gender || lobby?.people.find((q: any) => q.name === p.name)?.gender}`
+                        : ""}{" "}
+                      · {p.alive ? gestureNames[p.gesture] : "已出局"}
                     </span>
                     {p.revealedRole && (
                       <em>{roleNames[p.revealedRole]} · 已公开</em>
@@ -941,7 +950,9 @@ function App() {
                   onClick={() => setPerson(p)}
                 >
                   <div className="avatar">{p.name.slice(-1)}</div>
-                  <h3>{p.name}</h3>
+                  <h3>
+                    {p.name} · {p.gender}
+                  </h3>
                   <p>{p.description}</p>
                   <span>一起经历了 {p.games} 局</span>
                 </button>
@@ -1138,7 +1149,10 @@ function App() {
             </button>
             <div className="avatar large">{person.name.slice(-1)}</div>
             <span className="eyebrow">A FRIEND AT THE TABLE</span>
-            <h2>{person.name}</h2>
+            <h2>
+              {person.name}
+              {person.gender ? ` · ${person.gender}` : ""}
+            </h2>
             <p>{person.description}</p>
             {person.gesture && (
               <p>最近的公开表现：{gestureNames[person.gesture]}</p>
@@ -1166,11 +1180,102 @@ function App() {
             <div className="role-chips">
               {review.roles.map((p: any) => (
                 <span key={p.seat} className={p.role === "wolf" ? "wolf" : ""}>
-                  {p.seat}号 {p.name} · {roleNames[p.role]}
+                  {p.seat}号 {p.name}
+                  {p.gender ? ` · ${p.gender}` : ""} · {roleNames[p.role]}
                 </span>
               ))}
             </div>
             <div className="review-events">
+              {review.decisionAudits?.length > 0 && (
+                <section>
+                  <h3>Agent 私人思考与决策 · 上帝视角</h3>
+                  <label>
+                    查看 Agent{" "}
+                    <select
+                      aria-label="复盘 Agent"
+                      value={reviewAgent}
+                      onChange={(e) => setReviewAgent(Number(e.target.value))}
+                    >
+                      <option value={0}>全部 Agent</option>
+                      {review.roles
+                        .filter((p: any) =>
+                          review.decisionAudits.some(
+                            (a: any) => a.seat === p.seat,
+                          ),
+                        )
+                        .map((p: any) => (
+                          <option key={p.seat} value={p.seat}>
+                            {p.seat}号 {p.name}
+                            {p.gender ? ` · ${p.gender}` : ""} ·{" "}
+                            {roleNames[p.role]}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  {review.decisionAudits
+                    .filter((a: any) => !reviewAgent || a.seat === reviewAgent)
+                    .map((a: any, i: number) => (
+                      <details key={i} className="event">
+                        <summary>
+                          第{a.day}日 · {a.seat}号 {a.name} · {a.action.type} ·{" "}
+                          {a.source === "fallback" ? "默认动作" : "模型决策"}
+                        </summary>
+                        <p>
+                          <strong>最终动作：</strong>
+                          {(
+                            {
+                              wolfVote: "夜间目标",
+                              seerCheck: "查验",
+                              witchUse: "药水",
+                              hunterShoot: "开枪",
+                              exileVote: "放逐投票",
+                              sheriffVote: "警长投票",
+                              badgeTransfer: "移交警徽",
+                              speak: "发言",
+                              sheriffJoin: "竞选报名",
+                              sheriffWithdraw: "退水",
+                              chooseDirection: "发言方向",
+                              selfDestruct: "自爆",
+                            } as Record<string, string>
+                          )[a.action.type] || a.action.type}
+                          {a.action.targetSeat === null
+                            ? " · 未指认目标"
+                            : a.action.targetSeat
+                              ? ` · ${a.action.targetSeat}号 ${review.roles.find((p: any) => p.seat === a.action.targetSeat)?.name || ""}`
+                              : ""}
+                          {a.action.mode ? ` · ${a.action.mode}` : ""}
+                          {typeof a.action.value === "boolean"
+                            ? a.action.value
+                              ? " · 是"
+                              : " · 否"
+                            : ""}
+                          {a.action.direction ? ` · ${a.action.direction}` : ""}
+                        </p>
+                        <p>
+                          <strong>决策理由：</strong>
+                          {a.decisionReason || "旧版本未记录"}
+                        </p>
+                        {a.attempts.map((attempt: any, j: number) => (
+                          <details key={j}>
+                            <summary>
+                              响应 {j + 1} ·{" "}
+                              {attempt.finishReason || "未提供结束标记"}
+                            </summary>
+                            <p style={{ whiteSpace: "pre-wrap" }}>
+                              <strong>服务返回的 think：</strong>
+                              {attempt.reasoningContent ||
+                                "服务未提供 think 内容"}
+                            </p>
+                            <details>
+                              <summary>原始最终回答</summary>
+                              <pre>{attempt.content}</pre>
+                            </details>
+                          </details>
+                        ))}
+                      </details>
+                    ))}
+                </section>
+              )}
               {review.events.map((e: any, i: number) => (
                 <div key={i}>
                   <small>

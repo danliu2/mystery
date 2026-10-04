@@ -113,6 +113,7 @@ export function observe(s: GameState, seat: number): Observation {
     players: s.players.map((q) => ({
       seat: q.seat,
       name: q.name,
+      gender: q.gender,
       description: q.description,
       alive: q.alive,
       revealedRole: q.revealedRole,

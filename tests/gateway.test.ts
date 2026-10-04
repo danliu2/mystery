@@ -32,7 +32,8 @@ async function server(
           choices: [
             {
               message: {
-                content: '{"action":{"type":"wolfVote","targetSeat":null}}',
+                content:
+                  '{"action":{"type":"wolfVote","targetSeat":null},"decisionReason":"选择空刀观察局势。"}',
               },
             },
           ],
@@ -171,6 +172,170 @@ test("aborted decisions and exhausted request budgets have no returned action", 
       ),
     );
     assert.equal(fixture.requests.length, 1);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("private audit retains provider thinking and the vote explanation without changing the action", async () => {
+  const fixture = await server(() => ({
+    body: {
+      id: "response-fixture",
+      choices: [
+        {
+          message: {
+            reasoning_content: "private-thinking-sentinel",
+            content: JSON.stringify({
+              action: { type: "wolfVote", targetSeat: null },
+              decisionReason: "选择空刀，因为目前没有足够信息。",
+            }),
+          },
+          finish_reason: "stop",
+        },
+      ],
+      usage: { total_tokens: 52 },
+    },
+  }));
+  try {
+    const g = new Gateway(cfg(fixture.url));
+    let audit: any;
+    const action = await g.decide(
+      view(),
+      createRoster(3).people[0],
+      undefined,
+      (record: any) => {
+        audit = record;
+      },
+    );
+    assert.deepEqual(action, { type: "wolfVote", targetSeat: null });
+    assert.equal(
+      audit.attempts[0].reasoningContent,
+      "private-thinking-sentinel",
+    );
+    assert.equal(audit.decisionReason, "选择空刀，因为目前没有足够信息。");
+    assert.ok(!JSON.stringify(action).includes("private-thinking"));
+    assert.ok(
+      !JSON.stringify(fixture.requests[0].body).includes("fake-key-sentinel"),
+    );
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("repair preserves both thinking responses and rejects an action missing its private explanation", async () => {
+  const fixture = await server((_body, _headers, n) => ({
+    body: {
+      choices: [
+        {
+          message: {
+            reasoning_content: `thinking-attempt-${n}`,
+            content: JSON.stringify({
+              action: { type: "wolfVote", targetSeat: null },
+              ...(n === 2
+                ? { decisionReason: "信息有限，所以保留夜间行动。" }
+                : {}),
+            }),
+          },
+          finish_reason: "stop",
+        },
+      ],
+    },
+  }));
+  try {
+    let audit: any;
+    const action = await new Gateway(cfg(fixture.url)).decide(
+      view(),
+      createRoster(3).people[0],
+      undefined,
+      (r) => {
+        audit = r;
+      },
+    );
+    assert.equal(action.type, "wolfVote");
+    assert.equal(fixture.requests.length, 2);
+    assert.deepEqual(
+      audit.attempts.map((r: any) => r.reasoningContent),
+      ["thinking-attempt-1", "thinking-attempt-2"],
+    );
+    assert.equal(audit.decisionReason, "信息有限，所以保留夜间行动。");
+    assert.notEqual(audit.attempts[0].promptHash, audit.attempts[1].promptHash);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("thinking output allowance fits the remaining configured context", async () => {
+  const fixture = await server(() => ({}));
+  try {
+    const person = createRoster(3).people[0];
+    person.style = "a".repeat(2700);
+    const o = view();
+    o.players = [];
+    o.events = [];
+    await new Gateway({
+      ...cfg(fixture.url),
+      contextTokens: 8192,
+      thinking: true,
+    }).decide(o, person);
+    const body = fixture.requests[0].body;
+    const input = body.messages.reduce(
+      (n: number, m: any) => n + [...m.content].length,
+      0,
+    );
+    assert.ok(
+      input + body.max_tokens + 256 <= 8192,
+      `input ${input} + output ${body.max_tokens} exceeds context`,
+    );
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("non-executable envelope metadata cannot override the validated action", async () => {
+  const fixture = await server(() => ({
+    body: {
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              actor: 99,
+              submitted: true,
+              privateReasoningUnused: "unused",
+              action: { type: "wolfVote", targetSeat: null },
+              decisionReason: "暂时没有合适的目标，因此空刀。",
+            }),
+          },
+        },
+      ],
+    },
+  }));
+  try {
+    assert.deepEqual(
+      await new Gateway(cfg(fixture.url)).decide(
+        view(),
+        createRoster(3).people[0],
+      ),
+      { type: "wolfVote", targetSeat: null },
+    );
+  } finally {
+    await fixture.close();
+  }
+});
+test("explicit provider thinking effort is validated and sent as configuration only", async () => {
+  const fixture = await server(() => ({}));
+  try {
+    const config = parseConfig(
+      `LLM_BASE_URL=${fixture.url}\nLLM_MODEL=fixture\nLLM_THINKING=true\nLLM_REASONING_EFFORT=low`,
+    );
+    await new Gateway(config).decide(view(), createRoster(3).people[0]);
+    assert.equal(fixture.requests[0].body.reasoning_effort, "low");
+    assert.throws(
+      () =>
+        parseConfig(
+          `LLM_BASE_URL=${fixture.url}\nLLM_MODEL=fixture\nLLM_REASONING_EFFORT=unsupported`,
+        ),
+      /INVALID_REASONING_EFFORT/,
+    );
   } finally {
     await fixture.close();
   }

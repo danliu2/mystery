@@ -39,6 +39,7 @@ export interface Player {
   actor: "human" | "ai";
   playerId: string | null;
   name: string;
+  gender?: string | null;
   description: string;
   role: Role;
   alive: boolean;
@@ -114,6 +115,7 @@ export interface GameState {
     reason: string;
   } | null;
   practice: boolean;
+  decisionAudits?: DecisionAudit[];
   runtime?: {
     mode: "model" | "demo";
     rosterSnapshot?: Roster;
@@ -141,6 +143,7 @@ export interface Observation {
   players: {
     seat: number;
     name: string;
+    gender?: string | null;
     description: string;
     alive: boolean;
     revealedRole: Role | null;
@@ -195,3 +198,27 @@ export const PHASE_LABELS: Record<string, string> = {
   exileLastWords: "放逐遗言",
   ended: "本局结束",
 };
+
+export interface DecisionAttempt {
+  promptHash: string;
+  responseId: string | null;
+  reasoningContent: string | null;
+  content: string;
+  finishReason: string | null;
+  receivedAt: string;
+}
+export interface DecisionAudit {
+  seat: number;
+  playerId: string;
+  name: string;
+  day: number;
+  phase: string;
+  windowId: string;
+  source: "model" | "fallback";
+  action: Action;
+  model: string;
+  promptHash: string;
+  decisionReason: string;
+  attempts: DecisionAttempt[];
+  error?: string;
+}

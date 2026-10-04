@@ -41,7 +41,11 @@ const errorLabels: Record<string, string> = {
 async function reloadConfig() {
   try {
     config = await loadConfig(configPath);
-    gateway = config ? new Gateway(config) : null;
+    gateway = config
+      ? new Gateway(config, {
+          promptDirectory: join(root, "resources/prompts/werewolf"),
+        })
+      : null;
     configError = "";
   } catch {
     config = null;
@@ -138,7 +142,7 @@ async function route(method: string, arg: any): Promise<unknown> {
       const baseURL = validateEndpoint(arg.baseURL);
       if (/[\r\n]/.test(arg.model) || !arg.model.trim())
         throw new Error("INVALID_CONFIG");
-      const text = `LLM_BASE_URL=${baseURL}\nLLM_MODEL=${arg.model.trim()}\nLLM_API_KEY=${config?.apiKey || ""}\nLLM_JSON_MODE=${arg.jsonMode}\nLLM_CONTEXT_TOKENS=${arg.contextTokens}\n`;
+      const text = `LLM_BASE_URL=${baseURL}\nLLM_MODEL=${arg.model.trim()}\nLLM_API_KEY=${config?.apiKey || ""}\nLLM_JSON_MODE=${arg.jsonMode}\nLLM_CONTEXT_TOKENS=${arg.contextTokens}\n${config?.thinking !== undefined ? `LLM_THINKING=${config.thinking}\n` : ""}${config?.reasoningEffort ? `LLM_REASONING_EFFORT=${config.reasoningEffort}\n` : ""}`;
       await writeFile(configPath, text, { mode: 0o600 });
       await reloadConfig();
       return settings();

@@ -1,0 +1,1 @@
+上次返回为空、截断、缺少decisionReason或不符合合法动作。请重新返回一个完整json，严格使用当前windowId和legalActions中的字段与目标，同时填写50–300字私人decisionReason。

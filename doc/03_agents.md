@@ -70,7 +70,7 @@ Player 指持续存在的 AI 朋友，不是每局抽到的游戏角色。人格
 }
 ```
 
-发言时 action 为 `{ "type":"speak", "text":"公开发言", "gestureId":"thoughtful" }`，只用gestureId生成公开神情，不接收额外自由旁白字段，避免重复；memoryNote ≤200 字，仅本人私有且不能是思维链。首版不请求或保存长推理过程。gestureId 必须为资源白名单（neutral、thoughtful、smile、frown、calm 等），由模板渲染“她停顿了一下”；不得输出“隐藏杀意”“女巫摸着药瓶”等全知旁白。本人可在发言中主动亮身份，属于发言而非系统证明。
+发言时 action 为 `{ "type":"speak", "text":"公开发言", "gestureId":"thoughtful" }`，只用gestureId生成公开神情，不接收额外自由旁白字段，避免重复；memoryNote ≤200 字，仅本人私有且不能是思维链。初始设计不请求或保存长推理过程；后续用户要求覆盖该取舍，当前实现保存服务返回的think与私人决策理由，仅终局上帝视角可读，见[LLM后端更新](10_llm_backend.md)。gestureId 必须为资源白名单（neutral、thoughtful、smile、frown、calm 等），由模板渲染“她停顿了一下”；不得输出“隐藏杀意”“女巫摸着药瓶”等全知旁白。本人可在发言中主动亮身份，属于发言而非系统证明。
 
 验证层次：解析 JSON → Schema（禁止未知字段）→ window 对应 → 动作资格与枚举 → 目标在合法集 → text 字数/空值 → 公开表达白名单。memoryNote 不决定游戏效果。失败最多一次修复请求，只给该玩家错误字段和同一合法视图；不得把别人的成功输出作为示例。
 
