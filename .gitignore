@@ -1,0 +1,14 @@
+secret/
+api_key.env
+*.env
+!*.env.example
+node_modules/
+dist/
+release/
+coverage/
+*.log
+.DS_Store
+.superpowers/
+.worktrees/
+playwright-report/
+test-results/
