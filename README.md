@@ -46,3 +46,7 @@ npm run format:check
 [设计文档索引](doc/README.md) · [开发状态、验证证据与已知限制](doc/09_development_status.md) · [玩家手册](doc/06_player_guide.md)
 
 [即时显示、真实 LLM 与人物一致性更新](doc/10_llm_backend.md) · [提示词资源](resources/prompts/werewolf/README.md)
+
+## 开源许可证
+
+项目采用 [MIT License](LICENSE)。
