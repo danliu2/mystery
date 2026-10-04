@@ -1,3 +1,48 @@
-import {createGame,submit} from '../src/domain/engine.js';import {observe} from '../src/domain/visibility.js';import {createRoster,selectFriends} from '../src/agents/personas.js';import {demoDecision} from '../src/agents/player.js';
-const rounds=Number(process.argv[2]||20);if(!Number.isInteger(rounds)||rounds<1||rounds>1000)throw new Error('rounds must be 1-1000');
-for(let count=6;count<=14;count++){const outcomes:Record<string,number>={};let maxSteps=0;for(let seed=1;seed<=rounds;seed++){const roster=createRoster(seed);const friends=selectFriends(roster,count-1,seed);let s=createGame({count,seed,friends:friends.map(p=>({playerId:p.id,name:p.name,description:p.description}))});let steps=0;while(!s.outcome){if(++steps>2000)throw new Error(`deadlock ${count}/${seed}/${s.phase}`);const seat=s.window.actors.find(i=>!Object.hasOwn(s.window.answers,i));if(!seat)throw new Error(`empty window ${s.phase}`);const o=observe(s,seat);const p=seat===1?roster.people[19]:friends[seat-2];const action=demoDecision(o,p);s=submit(s,seat,{commandId:`${steps}`,windowId:o.windowId!,action});if(s.players.some(p=>p.seat<1||p.seat>count))throw new Error('invalid seat');}outcomes[s.outcome.status]=(outcomes[s.outcome.status]||0)+1;maxSteps=Math.max(maxSteps,steps);}console.log(`${count}人: ${rounds}局, ${JSON.stringify(outcomes)}, max ${maxSteps}动作`);}
+import { createGame, submit } from "../src/domain/engine.js";
+import { observe } from "../src/domain/visibility.js";
+import { createRoster, selectFriends } from "../src/agents/personas.js";
+import { demoDecision } from "../src/agents/player.js";
+const rounds = Number(process.argv[2] || 20);
+if (!Number.isInteger(rounds) || rounds < 1 || rounds > 1000)
+  throw new Error("rounds must be 1-1000");
+for (let count = 6; count <= 14; count++) {
+  const outcomes: Record<string, number> = {};
+  let maxSteps = 0;
+  for (let seed = 1; seed <= rounds; seed++) {
+    const roster = createRoster(seed);
+    const friends = selectFriends(roster, count - 1, seed);
+    let s = createGame({
+      count,
+      seed,
+      friends: friends.map((p) => ({
+        playerId: p.id,
+        name: p.name,
+        description: p.description,
+      })),
+    });
+    let steps = 0;
+    while (!s.outcome) {
+      if (++steps > 2000)
+        throw new Error(`deadlock ${count}/${seed}/${s.phase}`);
+      const seat = s.window.actors.find(
+        (i) => !Object.hasOwn(s.window.answers, i),
+      );
+      if (!seat) throw new Error(`empty window ${s.phase}`);
+      const o = observe(s, seat);
+      const p = seat === 1 ? roster.people[19] : friends[seat - 2];
+      const action = demoDecision(o, p);
+      s = submit(s, seat, {
+        commandId: `${steps}`,
+        windowId: o.windowId!,
+        action,
+      });
+      if (s.players.some((p) => p.seat < 1 || p.seat > count))
+        throw new Error("invalid seat");
+    }
+    outcomes[s.outcome.status] = (outcomes[s.outcome.status] || 0) + 1;
+    maxSteps = Math.max(maxSteps, steps);
+  }
+  console.log(
+    `${count}人: ${rounds}局, ${JSON.stringify(outcomes)}, max ${maxSteps}动作`,
+  );
+}

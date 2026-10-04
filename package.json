@@ -12,7 +12,11 @@
     "typecheck": "tsc --noEmit",
     "build": "node scripts/build.mjs",
     "start": "npm run build && electron .",
-    "simulate": "tsx scripts/simulate.ts"
+    "simulate": "tsx scripts/simulate.ts",
+    "setup-runtime": "node scripts/install-runtime.mjs",
+    "postinstall": "node scripts/install-runtime.mjs",
+    "smoke": "npm run build && node scripts/smoke.mjs",
+    "format:check": "prettier --check src tests scripts resources package.json tsconfig.json"
   },
   "dependencies": {
     "ajv": "^8.20.0",
@@ -26,7 +30,11 @@
     "electron": "44.4.3",
     "esbuild": "^0.28.2",
     "playwright": "^1.63.0",
+    "prettier": "^3.9.9",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }

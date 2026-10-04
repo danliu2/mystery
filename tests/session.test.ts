@@ -1,7 +1,91 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
-import {Session} from '../src/main/session.js';import {Store} from '../src/storage/store.js';
-async function setup(){const dir=await mkdtemp(join(tmpdir(),'mystery-session-'));const session=new Session(new Store(dir),null);await session.initialize();return{session,dir,close:async()=>{session.pause();await rm(dir,{recursive:true,force:true});}};}
-test('session binds actions to the human and gates full review until ended',async()=>{const f=await setup();try{await f.session.start({count:6,humanRole:'wolf'});const v=f.session.view();assert.equal(v?.observation.ownSeat,1);await assert.rejects(f.session.review(),/GAME_NOT_ENDED/);assert.ok(!JSON.stringify(v).includes('rng'));const w=v!.observation.windowId!;await f.session.ack(v!.observation.events.at(-1)!.id);await assert.rejects(f.session.act({commandId:'attack',windowId:w,action:{type:'seerCheck',targetSeat:2}}),/INVALID_PAYLOAD/);}finally{await f.close();}});
-test('presentation barrier hides legal actions until visible events acknowledged',async()=>{const f=await setup();try{await f.session.start({count:6,humanRole:'wolf'});assert.equal(f.session.view()!.observation.legalActions.length,0);await f.session.ack(f.session.view()!.observation.events.at(-1)!.id);assert.equal(f.session.view()!.observation.legalActions[0].type,'wolfVote');}finally{await f.close();}});
-test('pause cancels scheduling and restore retains the accepted human vote',async()=>{const f=await setup();try{await f.session.start({count:6,humanRole:'wolf'});let v=f.session.view()!;await f.session.ack(v.observation.events.at(-1)!.id);v=f.session.view()!;await f.session.act({commandId:'vote',windowId:v.observation.windowId!,action:{type:'wolfVote',targetSeat:3}});f.session.pause();const restored=new Session(new Store(f.dir),null);await restored.initialize();await restored.load(v.observation.gameId);assert.equal(restored.view()!.observation.submitted,true);assert.equal(restored.view()!.paused,true);restored.pause();}finally{await f.close();}});
-test('abandon ends game without adding experience and repeated exit is safe',async()=>{const f=await setup();try{await f.session.start({count:6,humanRole:'wolf'});await f.session.abandon();assert.equal(f.session.view()!.observation.outcome?.status,'aborted');assert.ok((await f.session.review()).roles.length===6);assert.equal(f.session.lobby().people[0].games,0);}finally{await f.close();}});
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { Session } from "../src/main/session.js";
+import { Store } from "../src/storage/store.js";
+async function setup() {
+  const dir = await mkdtemp(join(tmpdir(), "mystery-session-"));
+  const session = new Session(new Store(dir), null);
+  await session.initialize();
+  return {
+    session,
+    dir,
+    close: async () => {
+      session.pause();
+      await rm(dir, { recursive: true, force: true });
+    },
+  };
+}
+test("session binds actions to the human and gates full review until ended", async () => {
+  const f = await setup();
+  try {
+    await f.session.start({ count: 6, humanRole: "wolf" });
+    const v = f.session.view();
+    assert.equal(v?.observation.ownSeat, 1);
+    await assert.rejects(f.session.review(), /GAME_NOT_ENDED/);
+    assert.ok(!JSON.stringify(v).includes("rng"));
+    const w = v!.observation.windowId!;
+    await f.session.ack(v!.observation.events.at(-1)!.id);
+    await assert.rejects(
+      f.session.act({
+        commandId: "attack",
+        windowId: w,
+        action: { type: "seerCheck", targetSeat: 2 },
+      }),
+      /INVALID_PAYLOAD/,
+    );
+  } finally {
+    await f.close();
+  }
+});
+test("presentation barrier hides legal actions until visible events acknowledged", async () => {
+  const f = await setup();
+  try {
+    await f.session.start({ count: 6, humanRole: "wolf" });
+    assert.equal(f.session.view()!.observation.legalActions.length, 0);
+    await f.session.ack(f.session.view()!.observation.events.at(-1)!.id);
+    assert.equal(
+      f.session.view()!.observation.legalActions[0].type,
+      "wolfVote",
+    );
+  } finally {
+    await f.close();
+  }
+});
+test("pause cancels scheduling and restore retains the accepted human vote", async () => {
+  const f = await setup();
+  try {
+    await f.session.start({ count: 6, humanRole: "wolf" });
+    let v = f.session.view()!;
+    await f.session.ack(v.observation.events.at(-1)!.id);
+    v = f.session.view()!;
+    await f.session.act({
+      commandId: "vote",
+      windowId: v.observation.windowId!,
+      action: { type: "wolfVote", targetSeat: 3 },
+    });
+    f.session.pause();
+    const restored = new Session(new Store(f.dir), null);
+    await restored.initialize();
+    await restored.load(v.observation.gameId);
+    assert.equal(restored.view()!.observation.submitted, true);
+    assert.equal(restored.view()!.paused, true);
+    restored.pause();
+  } finally {
+    await f.close();
+  }
+});
+test("abandon ends game without adding experience and repeated exit is safe", async () => {
+  const f = await setup();
+  try {
+    await f.session.start({ count: 6, humanRole: "wolf" });
+    await f.session.abandon();
+    assert.equal(f.session.view()!.observation.outcome?.status, "aborted");
+    assert.ok((await f.session.review()).roles.length === 6);
+    assert.equal(f.session.lobby().people[0].games, 0);
+  } finally {
+    await f.close();
+  }
+});
