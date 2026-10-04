@@ -25,6 +25,14 @@ const gestureNames: Record<string, string> = {
   frown: "微微皱眉",
   calm: "神情平静",
 };
+const finishReasonNames: Record<string, string> = {
+  stop: "正常结束",
+  length: "达到输出或上下文限制",
+  content_filter: "内容被过滤",
+  tool_calls: "请求工具调用",
+  insufficient_system_resource: "服务资源不足",
+  aborted: "生成中断",
+};
 const eventNames: Record<string, string> = {
   host: "主持人",
   speech: "发言",
@@ -116,15 +124,25 @@ function ReviewDetails({ review }: { review: any }) {
                   {a.attempts.map((attempt: any, j: number) => (
                     <details key={j}>
                       <summary>
-                        响应 {j + 1} ·{" "}
-                        {attempt.finishReason || "未提供结束标记"}
+                        响应 {j + 1} · 生成状态：
+                        {attempt.finishReason
+                          ? `${finishReasonNames[attempt.finishReason] || "未知状态"}（${attempt.finishReason}）`
+                          : "服务未提供结束标记"}
                       </summary>
+                      <p>
+                        内容校验：
+                        {attempt.validationError
+                          ? "未通过，此响应未用于执行动作"
+                          : attempt.validationError === null
+                            ? "通过合法动作与私人理由校验"
+                            : "旧日志未记录逐次校验结果；最终执行动作见上方"}
+                      </p>
                       <p style={{ whiteSpace: "pre-wrap" }}>
                         <strong>服务返回的 think：</strong>
                         {attempt.reasoningContent || "服务未提供 think 内容"}
                       </p>
                       <details>
-                        <summary>原始最终回答</summary>
+                        <summary>原始最终回答 JSON（content）</summary>
                         <pre>{attempt.content}</pre>
                       </details>
                     </details>

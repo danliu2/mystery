@@ -208,6 +208,7 @@ test("private audit retains provider thinking and the vote explanation without c
       },
     );
     assert.deepEqual(action, { type: "wolfVote", targetSeat: null });
+    assert.equal(audit.attempts[0].validationError, null);
     assert.equal(
       audit.attempts[0].reasoningContent,
       "private-thinking-sentinel",
@@ -338,5 +339,45 @@ test("explicit provider thinking effort is validated and sent as configuration o
     );
   } finally {
     await fixture.close();
+  }
+});
+
+test("abnormal provider finish reasons cannot authorize an otherwise valid action", async () => {
+  for (const finishReason of [
+    "content_filter",
+    "tool_calls",
+    "insufficient_system_resource",
+    "aborted",
+  ]) {
+    const fixture = await server(() => ({
+      body: {
+        choices: [
+          {
+            finish_reason: finishReason,
+            message: {
+              content: JSON.stringify({
+                action: { type: "wolfVote", targetSeat: null },
+                decisionReason: "这是合法 JSON，但生成没有正常完成。",
+              }),
+            },
+          },
+        ],
+        usage: { total_tokens: 10 },
+      },
+    }));
+    try {
+      const g = new Gateway(cfg(fixture.url));
+      let audit: any;
+      await assert.rejects(
+        g.decide(view(), createRoster(3).people[0], undefined, (record) => {
+          audit = record;
+        }),
+        /INVALID_MODEL_OUTPUT/,
+      );
+      assert.equal(audit.attempts[0].finishReason, finishReason);
+      assert.equal(audit.attempts[0].validationError, "INVALID_MODEL_OUTPUT");
+    } finally {
+      await fixture.close();
+    }
   }
 });

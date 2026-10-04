@@ -205,6 +205,7 @@ export interface DecisionAttempt {
   reasoningContent: string | null;
   content: string;
   finishReason: string | null;
+  validationError?: string | null;
   receivedAt: string;
 }
 export interface DecisionAudit {

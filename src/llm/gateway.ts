@@ -265,6 +265,13 @@ export class Gateway {
         }
         const message = data.choices?.[0]?.message;
         const text = message?.content;
+        const finishReason = data.choices?.[0]?.finish_reason ?? null;
+        // Missing markers are tolerated for older compatible services. Explicit
+        // abnormal termination must never authorize a game action.
+        const invalidResponse =
+          (finishReason !== null && finishReason !== "stop") ||
+          typeof text !== "string" ||
+          !text.trim();
         capture?.({
           promptHash: createHash("sha256")
             .update(JSON.stringify(messages))
@@ -275,7 +282,10 @@ export class Gateway {
               ? message.reasoning_content
               : null,
           content: typeof text === "string" ? text : "",
-          finishReason: data.choices?.[0]?.finish_reason || null,
+          finishReason: typeof finishReason === "string" ? finishReason : null,
+          ...(invalidResponse
+            ? { validationError: "INVALID_MODEL_OUTPUT" }
+            : {}),
           receivedAt: new Date().toISOString(),
         });
         if (
@@ -288,12 +298,7 @@ export class Gateway {
             estimated + (typeof text === "string" ? [...text].length : 0);
           this.usage.estimated = true;
         }
-        if (
-          data.choices?.[0]?.finish_reason === "length" ||
-          typeof text !== "string" ||
-          !text.trim()
-        )
-          throw new ServiceError("INVALID_MODEL_OUTPUT");
+        if (invalidResponse) throw new ServiceError("INVALID_MODEL_OUTPUT");
         return text;
       } catch (e) {
         if (e instanceof ServiceError) throw e;
@@ -399,12 +404,24 @@ export class Gateway {
     const attempts: DecisionAttempt[] = [];
     let decisionReason = "";
     const parse = (text: string) => {
-      const action = candidate(text, view);
-      const reason = JSON.parse(text).decisionReason;
-      if (typeof reason !== "string" || !reason.trim() || reason.length > 2000)
-        throw new ServiceError("INVALID_MODEL_OUTPUT");
-      decisionReason = reason.trim();
-      return action;
+      try {
+        const action = candidate(text, view);
+        const reason = JSON.parse(text).decisionReason;
+        if (
+          typeof reason !== "string" ||
+          !reason.trim() ||
+          reason.length > 2000
+        )
+          throw new ServiceError("INVALID_MODEL_OUTPUT");
+        decisionReason = reason.trim();
+        const last = attempts.at(-1);
+        if (last) last.validationError = null;
+        return action;
+      } catch (error) {
+        const last = attempts.at(-1);
+        if (last) last.validationError = "INVALID_MODEL_OUTPUT";
+        throw error;
+      }
     };
     const capture = (a: DecisionAttempt) => attempts.push(a);
     try {
