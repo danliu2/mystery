@@ -110,7 +110,12 @@ test("accepted network decisions are persisted with private reasoning through th
     for (let step = 0; step < 2000; step++) {
       let v = session.view()!;
       if (v.observation.outcome) break;
-      assert.ok(!JSON.stringify(v).includes("network-private-thinking"));
+      if (!v.spectator)
+        assert.ok(!JSON.stringify(v).includes("network-private-thinking"));
+      else if (v.spectator.decisionAudits.some((a) => a.source === "model"))
+        assert.ok(
+          JSON.stringify(v.spectator).includes("network-private-thinking"),
+        );
       assert.equal(v.paused, false, v.notice);
       if (v.displayed < v.presentationTarget)
         await session.ack(`v${v.presentationTarget}`);

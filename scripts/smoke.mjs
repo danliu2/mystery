@@ -60,6 +60,15 @@ try {
     } else await page.waitForTimeout(100);
   }
   if (!state?.observation.outcome) throw new Error("game did not terminate");
+  if (
+    !state.spectator ||
+    state.observation.players.some((p) => !p.revealedRole)
+  )
+    throw new Error("automatic omniscient view missing");
+  await page.getByRole("region", { name: "全视野观战" }).waitFor();
+  await page.screenshot({
+    path: ".superpowers/sdd/werewolf/screenshots/spectator.png",
+  });
   await page.getByRole("button", { name: "查看全知复盘" }).click();
   await page.getByRole("dialog", { name: "全知复盘" }).waitFor();
   await page.screenshot({

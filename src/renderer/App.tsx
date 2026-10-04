@@ -34,6 +34,118 @@ const eventNames: Record<string, string> = {
   votes: "公开票型",
   skill: "公开技能",
 };
+function ReviewDetails({ review }: { review: any }) {
+  const [reviewAgent, setReviewAgent] = useState(0);
+  return (
+    <>
+      <div className="role-chips">
+        {review.roles.map((p: any) => (
+          <span key={p.seat} className={p.role === "wolf" ? "wolf" : ""}>
+            {p.seat}号 {p.name}
+            {p.gender ? ` · ${p.gender}` : ""} · {roleNames[p.role]}
+          </span>
+        ))}
+      </div>
+      <div className="review-events">
+        {review.decisionAudits?.length > 0 && (
+          <section>
+            <h3>Agent 私人思考与决策 · 上帝视角</h3>
+            <label>
+              查看 Agent{" "}
+              <select
+                aria-label="复盘 Agent"
+                value={reviewAgent}
+                onChange={(e) => setReviewAgent(Number(e.target.value))}
+              >
+                <option value={0}>全部 Agent</option>
+                {review.roles
+                  .filter((p: any) =>
+                    review.decisionAudits.some((a: any) => a.seat === p.seat),
+                  )
+                  .map((p: any) => (
+                    <option key={p.seat} value={p.seat}>
+                      {p.seat}号 {p.name}
+                      {p.gender ? ` · ${p.gender}` : ""} · {roleNames[p.role]}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            {review.decisionAudits
+              .filter((a: any) => !reviewAgent || a.seat === reviewAgent)
+              .map((a: any, i: number) => (
+                <details key={i} className="event">
+                  <summary>
+                    第{a.day}日 · {a.seat}号 {a.name} · {a.action.type} ·{" "}
+                    {a.source === "fallback" ? "默认动作" : "模型决策"}
+                  </summary>
+                  <p>
+                    <strong>最终动作：</strong>
+                    {(
+                      {
+                        wolfVote: "夜间目标",
+                        seerCheck: "查验",
+                        witchUse: "药水",
+                        hunterShoot: "开枪",
+                        exileVote: "放逐投票",
+                        sheriffVote: "警长投票",
+                        badgeTransfer: "移交警徽",
+                        speak: "发言",
+                        sheriffJoin: "竞选报名",
+                        sheriffWithdraw: "退水",
+                        chooseDirection: "发言方向",
+                        selfDestruct: "自爆",
+                      } as Record<string, string>
+                    )[a.action.type] || a.action.type}
+                    {a.action.targetSeat === null
+                      ? " · 未指认目标"
+                      : a.action.targetSeat
+                        ? ` · ${a.action.targetSeat}号 ${review.roles.find((p: any) => p.seat === a.action.targetSeat)?.name || ""}`
+                        : ""}
+                    {a.action.mode ? ` · ${a.action.mode}` : ""}
+                    {typeof a.action.value === "boolean"
+                      ? a.action.value
+                        ? " · 是"
+                        : " · 否"
+                      : ""}
+                    {a.action.direction ? ` · ${a.action.direction}` : ""}
+                  </p>
+                  <p>
+                    <strong>决策理由：</strong>
+                    {a.decisionReason || "旧版本未记录"}
+                  </p>
+                  {a.attempts.map((attempt: any, j: number) => (
+                    <details key={j}>
+                      <summary>
+                        响应 {j + 1} ·{" "}
+                        {attempt.finishReason || "未提供结束标记"}
+                      </summary>
+                      <p style={{ whiteSpace: "pre-wrap" }}>
+                        <strong>服务返回的 think：</strong>
+                        {attempt.reasoningContent || "服务未提供 think 内容"}
+                      </p>
+                      <details>
+                        <summary>原始最终回答</summary>
+                        <pre>{attempt.content}</pre>
+                      </details>
+                    </details>
+                  ))}
+                </details>
+              ))}
+          </section>
+        )}
+        {review.events.map((e: any, i: number) => (
+          <div key={i}>
+            <small>
+              第{e.day}日 · {eventNames[e.type] || "事实"}
+            </small>
+            <p>{e.text}</p>
+            {e.data && <pre>{JSON.stringify(e.data, null, 2)}</pre>}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
 function App() {
   const [lobby, setLobby] = useState<any>(null),
     [view, setView] = useState<SessionView | null>(null),
@@ -49,7 +161,6 @@ function App() {
   const [person, setPerson] = useState<any>(null),
     [manual, setManual] = useState(""),
     [review, setReview] = useState<any>(null),
-    [reviewAgent, setReviewAgent] = useState(0),
     [speed, setSpeed] = useState(0),
     [partial, setPartial] = useState({ id: "", text: "" }),
     [draft, setDraft] = useState(""),
@@ -504,7 +615,12 @@ function App() {
                             : eventNames[e.type] || "记录"}
                         </strong>
                         <span>
-                          第{e.day}日 {e.private ? "· 仅你可见" : ""}
+                          第{e.day}日{" "}
+                          {e.private
+                            ? view!.spectator
+                              ? "· 私人记录"
+                              : "· 仅你可见"
+                            : ""}
                         </span>
                       </div>
                       <p>
@@ -551,6 +667,16 @@ function App() {
                     : "离线演示 · 无模型请求"}
                 </span>
               </div>
+              {view!.spectator && (
+                <section className="spectator-panel" aria-label="全视野观战">
+                  <h3>{o.outcome ? "全知复盘" : "已出局 · 全视野观战"}</h3>
+                  <p>
+                    所有身份、私人记录、动作与 Agent
+                    思考已开放，记录随对局推进更新。
+                  </p>
+                  <ReviewDetails review={view!.spectator} />
+                </section>
+              )}
               <div className="action-panel">
                 {o.outcome ? (
                   <div className="end-card">
@@ -881,7 +1007,10 @@ function App() {
                       · {p.alive ? gestureNames[p.gesture] : "已出局"}
                     </span>
                     {p.revealedRole && (
-                      <em>{roleNames[p.revealedRole]} · 已公开</em>
+                      <em>
+                        {roleNames[p.revealedRole]} ·{" "}
+                        {view!.spectator ? "真实身份" : "已公开"}
+                      </em>
                     )}
                   </div>
                   {p.sheriff && <span className="badge">♛</span>}
@@ -1177,115 +1306,7 @@ function App() {
             <span className="eyebrow">AFTER THE FINAL CURTAIN</span>
             <h2>全知事实复盘</h2>
             <p>整局已结束。以下真相不会自动成为 AI 朋友的跨局经验。</p>
-            <div className="role-chips">
-              {review.roles.map((p: any) => (
-                <span key={p.seat} className={p.role === "wolf" ? "wolf" : ""}>
-                  {p.seat}号 {p.name}
-                  {p.gender ? ` · ${p.gender}` : ""} · {roleNames[p.role]}
-                </span>
-              ))}
-            </div>
-            <div className="review-events">
-              {review.decisionAudits?.length > 0 && (
-                <section>
-                  <h3>Agent 私人思考与决策 · 上帝视角</h3>
-                  <label>
-                    查看 Agent{" "}
-                    <select
-                      aria-label="复盘 Agent"
-                      value={reviewAgent}
-                      onChange={(e) => setReviewAgent(Number(e.target.value))}
-                    >
-                      <option value={0}>全部 Agent</option>
-                      {review.roles
-                        .filter((p: any) =>
-                          review.decisionAudits.some(
-                            (a: any) => a.seat === p.seat,
-                          ),
-                        )
-                        .map((p: any) => (
-                          <option key={p.seat} value={p.seat}>
-                            {p.seat}号 {p.name}
-                            {p.gender ? ` · ${p.gender}` : ""} ·{" "}
-                            {roleNames[p.role]}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
-                  {review.decisionAudits
-                    .filter((a: any) => !reviewAgent || a.seat === reviewAgent)
-                    .map((a: any, i: number) => (
-                      <details key={i} className="event">
-                        <summary>
-                          第{a.day}日 · {a.seat}号 {a.name} · {a.action.type} ·{" "}
-                          {a.source === "fallback" ? "默认动作" : "模型决策"}
-                        </summary>
-                        <p>
-                          <strong>最终动作：</strong>
-                          {(
-                            {
-                              wolfVote: "夜间目标",
-                              seerCheck: "查验",
-                              witchUse: "药水",
-                              hunterShoot: "开枪",
-                              exileVote: "放逐投票",
-                              sheriffVote: "警长投票",
-                              badgeTransfer: "移交警徽",
-                              speak: "发言",
-                              sheriffJoin: "竞选报名",
-                              sheriffWithdraw: "退水",
-                              chooseDirection: "发言方向",
-                              selfDestruct: "自爆",
-                            } as Record<string, string>
-                          )[a.action.type] || a.action.type}
-                          {a.action.targetSeat === null
-                            ? " · 未指认目标"
-                            : a.action.targetSeat
-                              ? ` · ${a.action.targetSeat}号 ${review.roles.find((p: any) => p.seat === a.action.targetSeat)?.name || ""}`
-                              : ""}
-                          {a.action.mode ? ` · ${a.action.mode}` : ""}
-                          {typeof a.action.value === "boolean"
-                            ? a.action.value
-                              ? " · 是"
-                              : " · 否"
-                            : ""}
-                          {a.action.direction ? ` · ${a.action.direction}` : ""}
-                        </p>
-                        <p>
-                          <strong>决策理由：</strong>
-                          {a.decisionReason || "旧版本未记录"}
-                        </p>
-                        {a.attempts.map((attempt: any, j: number) => (
-                          <details key={j}>
-                            <summary>
-                              响应 {j + 1} ·{" "}
-                              {attempt.finishReason || "未提供结束标记"}
-                            </summary>
-                            <p style={{ whiteSpace: "pre-wrap" }}>
-                              <strong>服务返回的 think：</strong>
-                              {attempt.reasoningContent ||
-                                "服务未提供 think 内容"}
-                            </p>
-                            <details>
-                              <summary>原始最终回答</summary>
-                              <pre>{attempt.content}</pre>
-                            </details>
-                          </details>
-                        ))}
-                      </details>
-                    ))}
-                </section>
-              )}
-              {review.events.map((e: any, i: number) => (
-                <div key={i}>
-                  <small>
-                    第{e.day}日 · {eventNames[e.type] || "事实"}
-                  </small>
-                  <p>{e.text}</p>
-                  {e.data && <pre>{JSON.stringify(e.data, null, 2)}</pre>}
-                </div>
-              ))}
-            </div>
+            <ReviewDetails review={review} />
           </section>
         </div>
       )}

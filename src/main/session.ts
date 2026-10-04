@@ -14,7 +14,7 @@ import {
   defaultAction,
   fullReview,
 } from "../domain/engine.js";
-import { observe } from "../domain/visibility.js";
+import { observe, observeHuman, isSpectating } from "../domain/visibility.js";
 import { PRESETS } from "../domain/resources.js";
 import { Store } from "../storage/store.js";
 import {
@@ -30,6 +30,7 @@ import { demoDecision } from "../agents/player.js";
 import { Gateway, ServiceError } from "../llm/gateway.js";
 export interface SessionView {
   observation: Observation;
+  spectator?: ReturnType<typeof fullReview>;
   paused: boolean;
   notice: string;
   mode: "model" | "demo";
@@ -91,12 +92,15 @@ export class Session extends EventEmitter {
   }
   view(): SessionView | null {
     if (!this.state) return null;
-    const o = observe(this.state, 1);
+    const o = observeHuman(this.state, 1);
     const target = o.events.length;
     if (this.displayed < target || this.paused || this.finishing)
       o.legalActions = [];
     return {
       observation: o,
+      ...(isSpectating(this.state, 1)
+        ? { spectator: fullReview(this.state, 1) }
+        : {}),
       paused: this.paused,
       notice: this.notice,
       mode: this.mode,
@@ -239,7 +243,7 @@ export class Session extends EventEmitter {
     return this.exclusive(async () => {
       if (!this.state) throw new Error("NO_MATCH");
       if (this.paused || this.finishing) throw new Error("PAUSED");
-      if (this.displayed < observe(this.state, 1).events.length)
+      if (this.displayed < observeHuman(this.state, 1).events.length)
         throw new Error("PRESENTATION_PENDING");
       await this.commit(submit(this.state, 1, command));
       return this.view();
@@ -253,7 +257,7 @@ export class Session extends EventEmitter {
         !/^v\d+$/.test(eventId) ||
         !Number.isInteger(n) ||
         n < 1 ||
-        n > observe(this.state, 1).events.length
+        n > observeHuman(this.state, 1).events.length
       )
         throw new Error("INVALID_EVENT");
       this.displayed = Math.max(this.displayed, n);
@@ -302,7 +306,7 @@ export class Session extends EventEmitter {
   }
   async review() {
     if (!this.state) throw new Error("NO_MATCH");
-    return fullReview(this.state);
+    return fullReview(this.state, 1);
   }
   async rest() {
     return this.exclusive(async () => {
@@ -434,7 +438,7 @@ export class Session extends EventEmitter {
       s.outcome ||
       this.paused ||
       this.finishing ||
-      this.displayed < observe(s, 1).events.length
+      this.displayed < observeHuman(s, 1).events.length
     )
       return;
     for (const seat of s.window.actors) {

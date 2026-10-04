@@ -156,3 +156,45 @@ export function observe(s: GameState, seat: number): Observation {
   o.viewRevision = digest(JSON.stringify(o)).slice(0, 24);
   return structuredClone(o);
 }
+
+// Renderer-only projection. Agents always use observe(), even after elimination.
+export function isSpectating(s: GameState, seat: number): boolean {
+  const p = s.players[seat - 1];
+  if (!p || p.actor !== "human") return false;
+  if (s.outcome) return true;
+  if (
+    p.alive ||
+    s.window.actors.includes(seat) ||
+    s.death.hunters.includes(seat) ||
+    s.sheriff === seat
+  )
+    return false;
+  const pendingWords =
+    s.death.words.includes(seat) &&
+    (["hunterShoot", "badgeTransfer"].includes(s.phase) ||
+      (s.day === 1 && s.phase.startsWith("sheriff")) ||
+      (["lastWords", "exileLastWords"].includes(s.phase) &&
+        s.queue.includes(seat)));
+  return !pendingWords;
+}
+export function observeHuman(s: GameState, seat: number): Observation {
+  const o = observe(s, seat);
+  if (!isSpectating(s, seat)) return o;
+  o.phase = s.phase;
+  o.phaseLabel = PHASE_LABELS[s.phase];
+  o.players.forEach((p, i) => {
+    p.revealedRole = s.players[i].role;
+  });
+  o.events = s.events.map((e, i) => ({
+    id: `v${i + 1}`,
+    day: e.day,
+    type: e.type,
+    text: e.text,
+    ...(e.seat ? { seat: e.seat } : {}),
+    private: e.audience !== "public",
+  }));
+  o.legalActions = [];
+  o.windowId = null;
+  o.viewRevision = digest(JSON.stringify(o)).slice(0, 24);
+  return o;
+}

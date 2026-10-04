@@ -936,3 +936,21 @@ h3 {
     display: none;
   }
 }
+
+.spectator-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 24px;
+}
+.table-panel:has(.spectator-panel) .history {
+  display: none;
+}
+.spectator-panel .review-events {
+  max-height: none;
+  overflow: visible;
+}
+.spectator-panel pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

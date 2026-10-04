@@ -10,7 +10,7 @@ import type {
 import { GESTURES } from "./types.js";
 import { PRESETS, ROLES, roleName, validatePresets } from "./resources.js";
 import { digest, random, shuffle } from "./random.js";
-import { legalActions } from "./visibility.js";
+import { isSpectating, legalActions } from "./visibility.js";
 
 export interface Setup {
   gameId?: string;
@@ -710,8 +710,9 @@ export function abortGame(original: GameState) {
   end(s, "aborted", "玩家放弃本局");
   return s;
 }
-export function fullReview(s: GameState) {
-  if (!s.outcome) throw new Error("GAME_NOT_ENDED");
+export function fullReview(s: GameState, viewerSeat?: number) {
+  if (!s.outcome && !(viewerSeat !== undefined && isSpectating(s, viewerSeat)))
+    throw new Error("GAME_NOT_ENDED");
   return {
     roles: s.players.map((p) => ({
       seat: p.seat,
@@ -719,14 +720,12 @@ export function fullReview(s: GameState) {
       gender: p.gender,
       role: p.role,
     })),
-    events: s.events
-      .filter((e) => e.type !== "action")
-      .map((e) => ({
-        day: e.day,
-        type: e.type,
-        text: e.text,
-        data: e.audience === "host" ? e.data : undefined,
-      })),
+    events: s.events.map((e) => ({
+      day: e.day,
+      type: e.type,
+      text: e.text,
+      data: structuredClone(e.data),
+    })),
     outcome: s.outcome,
     decisionAudits: structuredClone(s.decisionAudits || []),
   };
