@@ -1,0 +1,137 @@
+[
+  {
+    "count": 6,
+    "roles": {
+      "wolf": 2,
+      "villager": 2,
+      "seer": 1,
+      "witch": 1,
+      "hunter": 0,
+      "idiot": 0
+    },
+    "sheriff": false,
+    "winMode": "city",
+    "version": 1,
+    "maxDays": 30
+  },
+  {
+    "count": 7,
+    "roles": {
+      "wolf": 2,
+      "villager": 3,
+      "seer": 1,
+      "witch": 1,
+      "hunter": 0,
+      "idiot": 0
+    },
+    "sheriff": false,
+    "winMode": "city",
+    "version": 1,
+    "maxDays": 30
+  },
+  {
+    "count": 8,
+    "roles": {
+      "wolf": 2,
+      "villager": 3,
+      "seer": 1,
+      "witch": 1,
+      "hunter": 1,
+      "idiot": 0
+    },
+    "sheriff": false,
+    "winMode": "edge",
+    "version": 1,
+    "maxDays": 30
+  },
+  {
+    "count": 9,
+    "roles": {
+      "wolf": 3,
+      "villager": 3,
+      "seer": 1,
+      "witch": 1,
+      "hunter": 1,
+      "idiot": 0
+    },
+    "sheriff": false,
+    "winMode": "edge",
+    "version": 1,
+    "maxDays": 30
+  },
+  {
+    "count": 10,
+    "roles": {
+      "wolf": 3,
+      "villager": 3,
+      "seer": 1,
+      "witch": 1,
+      "hunter": 1,
+      "idiot": 1
+    },
+    "sheriff": true,
+    "winMode": "edge",
+    "version": 1,
+    "maxDays": 30
+  },
+  {
+    "count": 11,
+    "roles": {
+      "wolf": 3,
+      "villager": 4,
+      "seer": 1,
+      "witch": 1,
+      "hunter": 1,
+      "idiot": 1
+    },
+    "sheriff": true,
+    "winMode": "edge",
+    "version": 1,
+    "maxDays": 30
+  },
+  {
+    "count": 12,
+    "roles": {
+      "wolf": 4,
+      "villager": 4,
+      "seer": 1,
+      "witch": 1,
+      "hunter": 1,
+      "idiot": 1
+    },
+    "sheriff": true,
+    "winMode": "edge",
+    "version": 1,
+    "maxDays": 30
+  },
+  {
+    "count": 13,
+    "roles": {
+      "wolf": 4,
+      "villager": 5,
+      "seer": 1,
+      "witch": 1,
+      "hunter": 1,
+      "idiot": 1
+    },
+    "sheriff": true,
+    "winMode": "edge",
+    "version": 1,
+    "maxDays": 30
+  },
+  {
+    "count": 14,
+    "roles": {
+      "wolf": 4,
+      "villager": 6,
+      "seer": 1,
+      "witch": 1,
+      "hunter": 1,
+      "idiot": 1
+    },
+    "sheriff": true,
+    "winMode": "edge",
+    "version": 1,
+    "maxDays": 30
+  }
+]

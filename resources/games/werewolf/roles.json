@@ -1,0 +1,32 @@
+{
+  "wolf": {
+    "name": "狼人",
+    "faction": "wolf",
+    "group": "wolf"
+  },
+  "villager": {
+    "name": "平民",
+    "faction": "good",
+    "group": "villager"
+  },
+  "seer": {
+    "name": "预言家",
+    "faction": "good",
+    "group": "god"
+  },
+  "witch": {
+    "name": "女巫",
+    "faction": "good",
+    "group": "god"
+  },
+  "hunter": {
+    "name": "猎人",
+    "faction": "good",
+    "group": "god"
+  },
+  "idiot": {
+    "name": "白痴",
+    "faction": "good",
+    "group": "god"
+  }
+}
